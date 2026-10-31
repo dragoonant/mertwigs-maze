@@ -1,0 +1,903 @@
+<title>Twistyhollow</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Henny+Penny&family=Alegreya+Sans:wght@400;500;700;800&display=swap">
+<style>
+/* Layout: the maze sits on a felt tabletop at left; a "player mat" column at right holds turn, actions, cards, roster and the tale. Stacks on phones. */
+:root{
+  --felt:#15302f;        /* tabletop */
+  --felt-2:#1d3f3d;      /* raised mat surfaces */
+  --line:#335d5b;        /* mat edges */
+  --mist:#dce8df;        /* main text */
+  --mist-dim:#9db6ad;    /* secondary text */
+  --marigold:#f0a73a;    /* the one accent: your move, your options */
+  --beet:#d0506a;        /* danger: monsters, losses */
+  --ink:#1a1714;
+  --font-display:"Henny Penny","Georgia",serif;
+  --font-body:"Alegreya Sans","Trebuchet MS",system-ui,sans-serif;
+  color-scheme:dark;
+}
+html,body{height:100%}
+body{background:var(--felt);color:var(--mist);font-family:var(--font-body);font-size:16px;line-height:1.4;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:10px 28px;
+  background-image:radial-gradient(ellipse at 30% 20%,rgba(255,255,255,.035),transparent 60%),radial-gradient(ellipse at 80% 90%,rgba(0,0,0,.25),transparent 55%);}
+button,select{font:inherit;color:inherit}
+.app{max-width:1220px;margin:0 auto;display:flex;flex-direction:column;gap:12px}
+.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:10px 20px}
+.brand h1{font-family:var(--font-display);font-weight:400;font-size:clamp(2rem,5vw,2.9rem);line-height:1;margin:0;color:var(--marigold);letter-spacing:.01em;text-shadow:0 2px 0 var(--ink)}
+.brand p{margin:4px 0 0;color:var(--mist-dim);font-size:.95rem}
+.top-actions{display:flex;gap:8px;flex-wrap:wrap}
+.btn{border:1.5px solid var(--line);background:var(--felt-2);padding:8px 14px;border-radius:10px;cursor:pointer;font-weight:700;transition:transform .08s,background .15s,border-color .15s}
+.btn:hover:not(:disabled){border-color:var(--mist-dim)}
+.btn:active:not(:disabled){transform:translateY(1px)}
+.btn:disabled{opacity:.42;cursor:not-allowed}
+.btn.primary{background:var(--marigold);border-color:var(--marigold);color:var(--ink)}
+.btn.primary:hover:not(:disabled){border-color:var(--mist)}
+.btn.pulse{animation:pulse 1.4s ease-in-out infinite}
+@keyframes pulse{50%{box-shadow:0 0 0 5px rgba(240,167,58,.28)}}
+:focus-visible{outline:3px solid var(--marigold);outline-offset:2px}
+
+.table{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:20px;align-items:start}
+@media (max-width:880px){.table{grid-template-columns:minmax(0,1fr)}}
+.board-col{display:flex;flex-direction:column;align-items:center;gap:8px;min-width:0}
+.board-wrap{position:relative;width:min(100%,max(300px,calc(100vh - 130px)));aspect-ratio:1;max-width:100%}
+#board{width:100%;height:100%;display:block;touch-action:manipulation;cursor:pointer;border-radius:18px}
+.hint{margin:0;min-height:1.4em;text-align:center;color:var(--mist-dim);font-size:.98rem;max-width:60ch;text-wrap:balance}
+.hint b{color:var(--marigold)}
+.toast{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) scale(.96);background:rgba(16,30,29,.95);border:2px solid var(--marigold);border-radius:14px;padding:14px 18px;min-width:min(86%,300px);max-width:88%;text-align:center;box-shadow:0 10px 30px rgba(0,0,0,.45);pointer-events:none;opacity:0;transition:opacity .18s,transform .18s}
+.toast.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
+.toast.bad{border-color:var(--beet)}
+.toast h4{margin:0 0 6px;font-family:var(--font-display);font-weight:400;font-size:1.35rem;color:var(--marigold);text-wrap:balance}
+.toast.bad h4{color:var(--beet)}
+.toast p{margin:0;font-size:.98rem}
+.dicerow{display:flex;justify-content:center;align-items:center;gap:10px;margin:8px 0 6px;font-variant-numeric:tabular-nums}
+.die{display:inline-grid;place-items:center;width:38px;height:38px;border-radius:9px;background:var(--mist);color:var(--ink);font-weight:800;font-size:1.3rem;border:2px solid var(--ink);box-shadow:0 3px 0 var(--ink)}
+.die.m{background:#f2c4cd}
+.dicerow small{color:var(--mist-dim);font-size:.85rem}
+
+.mat{display:flex;flex-direction:column;gap:12px;min-width:0}
+.panel{background:var(--felt-2);border:1.5px solid var(--line);border-radius:14px;padding:12px 14px}
+.turn{display:grid;grid-template-columns:64px minmax(0,1fr);gap:4px 12px;align-items:center}
+.turn .who{font-family:var(--font-display);font-size:1.3rem;line-height:1.1}
+.turn .sub{color:var(--mist-dim);font-size:.9rem}
+.turn .abil{grid-column:1/-1;font-size:.9rem;color:var(--mist-dim);margin-top:4px}
+.turn .abil b{color:var(--mist)}
+.aprow{grid-column:1/-1;display:flex;align-items:center;gap:6px;margin-top:6px;flex-wrap:wrap}
+.aprow .lbl{font-size:.75rem;letter-spacing:.08em;text-transform:uppercase;color:var(--mist-dim);margin-right:2px}
+.pip{width:16px;height:16px;border-radius:50%;border:2px solid var(--marigold)}
+.pip.on{background:var(--marigold)}
+.round{margin-left:auto;font-size:.8rem;color:var(--mist-dim);font-variant-numeric:tabular-nums}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.actions .wide{grid-column:1/-1}
+.seg{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;border:1.5px solid var(--line);border-radius:10px;overflow:hidden}
+.seg button{border:0;background:transparent;padding:8px 6px;font-weight:700;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--mist);color:var(--ink)}
+.seg button:disabled{opacity:.42;cursor:not-allowed}
+.status{grid-column:1/-1;margin:0;color:var(--mist-dim);font-size:.95rem}
+.status b{color:var(--mist)}
+.hand h3,.roster h3,.logbox h3{margin:0 0 8px;font-size:.75rem;letter-spacing:.1em;text-transform:uppercase;color:var(--mist-dim);font-weight:700}
+.cards{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.card{display:flex;flex-direction:column;gap:2px;text-align:left;border:1.5px dashed var(--marigold);background:rgba(240,167,58,.07);border-radius:10px;padding:8px 10px;cursor:pointer;min-width:0}
+.card:hover:not(:disabled){background:rgba(240,167,58,.15)}
+.card:disabled{opacity:.5;cursor:not-allowed}
+.card .cn{font-weight:800;color:var(--marigold)}
+.card .ct{font-size:.82rem;color:var(--mist-dim);line-height:1.25}
+.card.back{border-style:solid;border-color:var(--line);background:transparent;cursor:default}
+.empty{color:var(--mist-dim);font-size:.9rem;margin:0}
+.rows{display:flex;flex-direction:column;gap:6px}
+.row{display:grid;grid-template-columns:36px minmax(0,1fr) auto;gap:10px;align-items:center;padding:4px 6px;border-radius:10px;border:1.5px solid transparent}
+.row.cur{border-color:var(--marigold);background:rgba(240,167,58,.07)}
+.row .nm{font-weight:700;line-height:1.1}
+.row .ctl{font-size:.78rem;color:var(--mist-dim)}
+.chips{display:flex;gap:3px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.chips .cnt{font-size:.78rem;color:var(--mist-dim);margin-left:4px;font-variant-numeric:tabular-nums}
+.logbox ol{list-style:none;margin:0;padding:0;max-height:220px;overflow:auto;display:flex;flex-direction:column;gap:5px;font-size:.92rem}
+.logbox li{padding-left:10px;border-left:2px solid var(--line)}
+.logbox li .r{color:var(--mist-dim);font-size:.75rem;margin-right:4px;font-variant-numeric:tabular-nums}
+.mon{color:var(--beet)}
+.rel{color:var(--marigold)}
+
+.modal[hidden]{display:none}
+.modal{position:fixed;inset:0;background:rgba(6,14,14,.66);display:grid;place-items:center;z-index:50;padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));overflow:auto}
+.sheet{background:var(--felt-2);border:2px solid var(--line);border-radius:18px;padding:20px clamp(16px,4vw,26px);width:min(620px,100%);max-height:100%;overflow:auto;box-shadow:0 20px 50px rgba(0,0,0,.5)}
+.sheet h2{font-family:var(--font-display);font-weight:400;color:var(--marigold);margin:0 0 6px;font-size:1.8rem;line-height:1.1;text-wrap:balance}
+.sheet .lede{margin:0 0 14px;color:var(--mist-dim)}
+.seats{display:flex;flex-direction:column;gap:10px}
+.seat{display:grid;grid-template-columns:64px minmax(0,1fr) auto;gap:12px;align-items:center;padding:8px;border-radius:12px;background:rgba(0,0,0,.14)}
+.seat-name{font-family:var(--font-display);font-size:1.15rem;line-height:1.1}
+.seat-kind{font-size:.85rem;color:var(--mist-dim)}
+.seat-abil{font-size:.86rem;margin-top:3px}
+.seat-abil b{color:var(--marigold)}
+.seat select{background:var(--felt);border:1.5px solid var(--line);border-radius:9px;padding:7px 8px;cursor:pointer}
+@media (max-width:480px){.seat{grid-template-columns:48px minmax(0,1fr)}.seat select{grid-column:1/-1}.seat canvas{width:48px!important;height:48px!important}}
+.sheet-actions{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;margin-top:16px}
+.err{color:var(--beet);margin:10px 0 0;font-weight:700}
+.rules h3{margin:16px 0 4px;font-size:.78rem;letter-spacing:.1em;text-transform:uppercase;color:var(--marigold)}
+.rules p,.rules li{max-width:65ch}
+.rules ul{margin:4px 0;padding-left:20px;display:flex;flex-direction:column;gap:4px}
+.rules p{margin:4px 0}
+.legend{display:flex;flex-wrap:wrap;gap:10px 16px;margin-top:6px}
+.legend span{display:flex;align-items:center;gap:6px;font-size:.88rem}
+.win{text-align:center}
+.win canvas{margin:0 auto 6px;display:block}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div class="app">
+  <header class="top">
+    <div class="brand">
+      <h1>Twistyhollow</h1>
+      <p>Find three relics in the shifting hedge-maze and slip out through the Snoring Gate.</p>
+    </div>
+    <div class="top-actions">
+      <button class="btn" id="btnRules" type="button">How to play</button>
+      <button class="btn" id="btnNew" type="button">New game</button>
+    </div>
+  </header>
+  <main class="table">
+    <section class="board-col">
+      <div class="board-wrap" id="boardWrap">
+        <canvas id="board" aria-label="The maze board"></canvas>
+        <div id="toast" class="toast" role="status" aria-live="polite"></div>
+      </div>
+      <p id="hint" class="hint"></p>
+    </section>
+    <aside class="mat">
+      <div id="turnCard" class="panel turn"></div>
+      <div id="actions" class="panel actions"></div>
+      <div id="hand" class="panel hand"></div>
+      <div id="roster" class="panel roster"></div>
+      <div class="panel logbox"><h3>The tale so far</h3><ol id="log"></ol></div>
+    </aside>
+  </main>
+</div>
+<div id="modal" class="modal" hidden><div class="sheet" id="sheet" role="dialog" aria-modal="true"></div></div>
+
+<script>
+(()=>{
+'use strict';
+// ---------- constants ----------
+const NEED=3, N=7, TAU=Math.PI*2, INF=1e9, GATE=[3,3];
+const DIRS=[{b:1,dx:0,dy:-1,o:4,k:'ArrowUp'},{b:2,dx:1,dy:0,o:8,k:'ArrowRight'},{b:4,dx:0,dy:1,o:1,k:'ArrowDown'},{b:8,dx:-1,dy:0,o:2,k:'ArrowLeft'}];
+const INK='#1a1714',HEDGE='#2e5838',HEDGE_D='#21452a',HEDGE_L='#3f7349',PATH='#e2c88e',PATH_D='#b99b5f',MARI='#f0a73a',BEET='#d0506a',MIST='#dce8df';
+const HEROES={
+  pip:{name:'Pip Thistledown',short:'Pip',kind:'Mole knight of the Lower Roots',color:'#ec6c3f',ability:'Burrower',text:'Dig straight through a hedge into a neighbouring tile for 2 AP.'},
+  wendle:{name:'Wendle Brack',short:'Wendle',kind:'Frog hedge-wizard, easily bored',color:'#4f9be6',ability:'Fidgety Fingers',text:'Your first Twist each turn is free.'},
+  marrow:{name:'Granny Marrowby',short:'Granny',kind:'Retired goat brawler',color:'#b07fe6',ability:'Headbutt',text:'+1 on every fight and jostle roll.'},
+  zizi:{name:'Zizi Cogwhistle',short:'Zizi',kind:'Clockwork owl with lamp eyes',color:'#f2cf3e',ability:'Lamp Eyes',text:'See what hides behind nook doors on and next to your tile.'}
+};
+const HERO_ORDER=['pip','wendle','marrow','zizi'];
+const SEAT_CORNER=[[0,0],[6,6],[6,0],[0,6]];
+const MONSTERS={
+  snout:{name:'Grumblesnout',power:2,blurb:'a lumpy, sulking boar-thing'},
+  sock:{name:'the Sock Wraith',power:1,blurb:'the ghost of every lost sock'},
+  hen:{name:'the Bog Hen',power:1,blurb:'a furious marsh chicken'}
+};
+const RELICS={teapot:'Moon Teapot',star:'Pickled Star',spoon:'Singing Spoon',jar:'Jar of Thunder',crown:'Velvet Crown',egg:'Clockwork Egg',bell:'Whispering Bell',map:'Map of Nowhere'};
+const RELIC_IDS=Object.keys(RELICS);
+const CARDS={
+  hop:{name:'Hop-Skip',text:'Hop to a neighbouring tile, straight through a hedge. Free.'},
+  spin:{name:'Big Spin',text:'Turn any loose tile on the board to face any way. Free.'},
+  whistle:{name:'Monster Whistle',text:'Call a monster up to 3 steps along open paths. Free.'},
+  pie:{name:'Second Breakfast',text:'+2 action points this turn.'},
+  pants:{name:'Brave Pants',text:'Win your next monster fight, no roll needed.'},
+  butter:{name:'Butterfingers',text:'An opponent drops a relic where they stand. Free.'}
+};
+const SAVE_KEY='twistyhollow-save-v1';
+const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// ---------- utils ----------
+const $=s=>document.querySelector(s);
+const idx=(x,y)=>y*N+x, inB=(x,y)=>x>=0&&y>=0&&x<N&&y<N;
+const rotM=(m,k)=>{k=((k%4)+4)%4;for(let i=0;i<k;i++)m=((m<<1)|(m>>3))&15;return m};
+const d6=()=>1+Math.floor(Math.random()*6);
+const pick=a=>a[Math.floor(Math.random()*a.length)];
+const shuffle=a=>{for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
+const takeRandom=a=>a.splice(Math.floor(Math.random()*a.length),1)[0];
+const wait=ms=>new Promise(r=>setTimeout(r,ms*(window.__twistySpeed||1)));
+function rng(seed){let a=seed>>>0;return()=>{a=(a+0x6D2B79F5)>>>0;let t=a;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return((t^(t>>>14))>>>0)/4294967296}}
+
+// ---------- state ----------
+let S=null;
+let seatCfg=[{ctrl:'human'},{ctrl:'ai'},{ctrl:'ai'},{ctrl:'off'}];
+const tileAt=(x,y)=>S.tiles[idx(x,y)];
+const mask=t=>rotM(t.base,t.rot);
+const cur=()=>S.players[S.turn];
+const isGate=(x,y)=>x===GATE[0]&&y===GATE[1];
+const nm=p=>`<b style="color:${HEROES[p.hero].color}">${HEROES[p.hero].short}</b>`;
+const mn=m=>`<b class="mon">${cap(MONSTERS[m.type].name)}</b>`;
+const listJoin=a=>a.length<2?a.join(''):a.slice(0,-1).join(', the ')+' and the '+a[a.length-1];
+const cap=s=>s[0].toUpperCase()+s.slice(1);
+const rl=r=>`<b class="rel">${RELICS[r]}</b>`;
+function connected(x,y,d){const D=DIRS[d],nx=x+D.dx,ny=y+D.dy;if(!inB(nx,ny))return false;return !!(mask(tileAt(x,y))&D.b)&&!!(mask(tileAt(nx,ny))&D.o)}
+function dirTo(x,y,nx,ny){for(let d=0;d<4;d++)if(x+DIRS[d].dx===nx&&y+DIRS[d].dy===ny)return d;return -1}
+const might=p=>(p.items.fork?2:0)+(p.hero==='marrow'?1:0);
+const heroesAt=(x,y)=>S.players.filter(p=>p.x===x&&p.y===y);
+const minRot=(t,bit)=>{const m=mask(t);for(let k=1;k<4;k++)if(rotM(m,k)&bit)return k;return INF};
+
+function genBoard(){
+  const shapes=[[5,28],[3,36],[7,24],[15,4],[1,8]];const tot=shapes.reduce((s,a)=>s+a[1],0);
+  const tiles=[];
+  for(let y=0;y<N;y++)for(let x=0;x<N;x++){
+    const t={base:0,rot:0,fixed:false,kind:'plain',nook:null,ground:[],seed:Math.floor(Math.random()*2**31),owner:null};
+    const ci=SEAT_CORNER.findIndex(c=>c[0]===x&&c[1]===y);
+    if(ci>=0){t.kind='start';t.fixed=true;t.base=[6,9,12,3][ci];}
+    else if(isGate(x,y)){t.kind='gate';t.fixed=true;t.base=15;}
+    else{let r=Math.random()*tot;for(const[m,w]of shapes){if((r-=w)<0){t.base=m;break}}if(!t.base)t.base=7;t.rot=Math.floor(Math.random()*4);}
+    tiles.push(t);
+  }
+  // nooks: spread out, away from homes
+  const cand=shuffle(tiles.map((t,i)=>i).filter(i=>{const t=tiles[i];if(t.fixed)return false;const x=i%N,y=(i/N)|0;return SEAT_CORNER.every(c=>Math.abs(c[0]-x)+Math.abs(c[1]-y)>=2)}));
+  const chosen=[];
+  for(const i of cand){if(chosen.length>=12)break;const x=i%N,y=(i/N)|0;if(chosen.every(j=>Math.abs(j%N-x)+Math.abs(((j/N)|0)-y)>=2))chosen.push(i)}
+  for(const i of cand){if(chosen.length>=12)break;if(!chosen.includes(i))chosen.push(i)}
+  const contents=shuffle([...RELIC_IDS,'boots','fork','gloop','gloop']);
+  chosen.forEach((i,k)=>tiles[i].nook={content:contents[k],searched:false});
+  return tiles;
+}
+function newDeck(){const d=[];for(const c of Object.keys(CARDS))for(let i=0;i<3;i++)d.push(c);return shuffle(d)}
+
+function newGame(cfg,preview){
+  const old=S;
+  const tiles=genBoard();const players=[];
+  cfg.forEach((s,i)=>{if(s.ctrl==='off')return;const[x,y]=SEAT_CORNER[i];players.push({hero:HERO_ORDER[i],ctrl:s.ctrl,x,y,relics:[],items:{boots:false,fork:false},hand:[],brave:false,known:{}});tiles[idx(x,y)].owner=HERO_ORDER[i];});
+  const nMon=players.length<=2?2:3;const types=['snout','sock','hen'];const monsters=[];
+  const spots=shuffle(tiles.map((t,i)=>i).filter(i=>!tiles[i].fixed&&SEAT_CORNER.every(c=>Math.abs(c[0]-i%N)+Math.abs(c[1]-((i/N)|0))>=3)));
+  for(let k=0;k<nMon;k++){const i=spots[k];monsters.push({type:types[k],x:i%N,y:(i/N)|0,last:null})}
+  S={tiles,players,monsters,deck:newDeck(),discard:[],turn:0,ap:0,round:1,phase:preview?'setup':'play',jostled:false,freeTwist:false,mode:'move',pending:null,log:[],winner:null,commit:null,token:(old?old.token:0)+1};
+  anim.reset();
+  players.forEach(p=>drawCard(p));
+  if(!preview){log(`The hedges rustle. ${players.map(nm).join(', ')} creep into Twistyhollow.`);startTurn(0)}
+  else render();
+}
+
+// ---------- logging, toast, saving ----------
+function log(h){S.log.unshift({r:S.round,h});if(S.log.length>90)S.log.length=90;}
+let toastUntil=0,toastTimer=null;
+function toast(title,body,bad,ms=1700){
+  const el=$('#toast');el.innerHTML=`<h4>${title}</h4>${body||''}`;el.classList.toggle('bad',!!bad);el.classList.add('show');
+  ms*=(window.__twistySpeed||1);toastUntil=Date.now()+ms;clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('show'),ms);
+}
+const waitToast=()=>new Promise(r=>setTimeout(r,Math.max(0,toastUntil-Date.now())+120));
+function save(){try{if(S&&S.phase!=='setup')localStorage.setItem(SAVE_KEY,JSON.stringify(S))}catch(e){}}
+function loadSave(){try{const s=JSON.parse(localStorage.getItem(SAVE_KEY)||'null');if(s&&s.tiles&&s.tiles.length===N*N&&s.players&&s.phase!=='over'&&s.phase!=='setup')return s}catch(e){}return null}
+function clearSave(){try{localStorage.removeItem(SAVE_KEY)}catch(e){}}
+
+// ---------- cards ----------
+function drawCard(p,announce){
+  if(p.hand.length>=4)return;
+  if(!S.deck.length){S.deck=shuffle(S.discard);S.discard=[]}
+  if(!S.deck.length)return;
+  const c=S.deck.pop();p.hand.push(c);
+  if(announce&&p.ctrl==='human')log(`${nm(p)} draws <b>${CARDS[c].name}</b>.`);
+}
+function consumeCard(p,c){const i=p.hand.indexOf(c);if(i<0)return false;p.hand.splice(i,1);S.discard.push(c);return true}
+
+// ---------- turn flow ----------
+function startTurn(i){
+  S.turn=i;const p=cur();
+  S.ap=3+(p.items.boots?1:0);S.jostled=false;S.freeTwist=p.hero==='wendle';S.mode='move';S.pending=null;S.commit=null;S.token++;
+  if(p.hand.length<3)drawCard(p,true);
+  if(p.hero==='zizi')zPeek(p);
+  save();render();
+  if(p.ctrl==='ai')runAI(S.token);
+  else if(S.players.filter(q=>q.ctrl==='human').length>1)toast(`${HEROES[p.hero].short}'s turn`,'<p>Pass the device along.</p>',false,1100);
+}
+function endTurn(){
+  if(S.phase!=='play')return;
+  S.pending=null;S.token++;
+  if(S.turn+1>=S.players.length)monsterPhase();else startTurn(S.turn+1);
+}
+function checkWin(p){
+  if(S.phase!=='play'&&S.phase!=='monsters')return false;
+  if(isGate(p.x,p.y)&&p.relics.length>=NEED){
+    S.phase='over';S.winner=S.players.indexOf(p);S.token++;
+    log(`${nm(p)} squeezes through the Snoring Gate with the ${listJoin(p.relics.map(rl))}. The gate snores on.`);
+    clearSave();render();setTimeout(showVictory,500*(window.__twistySpeed||1));return true;
+  }
+  return false;
+}
+function zPeek(p){for(let y=0;y<N;y++)for(let x=0;x<N;x++){if(Math.abs(x-p.x)+Math.abs(y-p.y)<=1){const t=tileAt(x,y);if(t.nook&&!t.nook.searched)p.known[idx(x,y)]=t.nook.content}}}
+
+function enterTile(p){
+  const t=tileAt(p.x,p.y);
+  for(const m of S.monsters.filter(m=>m.x===p.x&&m.y===p.y)){if(!fight(p,m))return}
+  if(t.ground.length){log(`${nm(p)} scoops up the ${t.ground.map(rl).join(' and the ')}.`);p.relics.push(...t.ground);t.ground=[]}
+  if(p.hero==='zizi')zPeek(p);
+  if(S.commit&&S.commit.from!==idx(p.x,p.y))S.commit=null;
+  checkWin(p);
+}
+function relocate(m){
+  const free=S.tiles.map((t,i)=>i).filter(i=>{const x=i%N,y=(i/N)|0;if(isGate(x,y)||S.tiles[i].kind==='start')return false;return S.players.every(p=>Math.abs(p.x-x)+Math.abs(p.y-y)>=3)});
+  const pool=free.length?free:S.tiles.map((t,i)=>i).filter(i=>!isGate(i%N,(i/N)|0)&&!heroesAt(i%N,(i/N)|0).length);
+  const i=pick(pool);m.x=i%N;m.y=(i/N)|0;m.last=null;
+}
+function fight(h,m){
+  const M=MONSTERS[m.type];let win;
+  if(h.brave){h.brave=false;win=true;toast('Brave Pants!',`<p>${nm(h)} hitches up the Brave Pants and ${M.name} bolts.</p>`);}
+  else{
+    const a=d6(),b=d6(),hs=a+might(h),ms=b+M.power;win=hs>=ms;
+    toast(win?`${HEROES[h.hero].short} wins!`:`${cap(M.name)} wins!`,
+      `<div class="dicerow"><span class="die">${a}</span><small>+${might(h)} = ${hs}</small><small>vs</small><span class="die m">${b}</span><small>+${M.power} = ${ms}</small></div><p>${win?`${cap(M.name)} flees into the hedges.`:'Ouch.'}</p>`,!win);
+  }
+  if(win){relocate(m);const before=h.hand.length;drawCard(h);log(`${nm(h)} sends ${mn(m)} packing${h.hand.length>before?' and finds a trick card in the scuffle':''}.`)}
+  else{
+    if(h.relics.length){const r=takeRandom(h.relics);tileAt(h.x,h.y).ground.push(r);log(`${mn(m)} flattens ${nm(h)}, who drops the ${rl(r)}.`)}
+    else if(h.hand.length){const c=takeRandom(h.hand);S.discard.push(c);log(`${mn(m)} flattens ${nm(h)} and eats their <b>${CARDS[c].name}</b> card.`)}
+    else log(`${mn(m)} flattens ${nm(h)}.`);
+    if(S.phase==='play'&&cur()===h)S.ap=0;
+  }
+  return win;
+}
+
+// ---------- actions ----------
+function actMove(d,burrow){
+  const p=cur(),D=DIRS[d],nx=p.x+D.dx,ny=p.y+D.dy;if(!inB(nx,ny))return false;
+  if(burrow){if(p.hero!=='pip'||S.ap<2)return false;S.ap-=2;log(`${nm(p)} digs straight through the hedge.`)}
+  else{if(!connected(p.x,p.y,d)||S.ap<1)return false;S.ap-=1}
+  p.x=nx;p.y=ny;enterTile(p);after();return true;
+}
+function canTwist(p,x,y){if(!inB(x,y))return false;const t=tileAt(x,y);if(t.fixed)return false;if(Math.abs(x-p.x)+Math.abs(y-p.y)>1)return false;return S.freeTwist||S.ap>=1}
+function actTwist(x,y){
+  const p=cur();if(!canTwist(p,x,y))return false;
+  if(S.freeTwist)S.freeTwist=false;else S.ap-=1;
+  tileAt(x,y).rot++;after();return true;
+}
+function actSearch(){
+  const p=cur(),t=tileAt(p.x,p.y);if(!t.nook||t.nook.searched||S.ap<1)return false;
+  S.ap-=1;t.nook.searched=true;const c=t.nook.content;
+  if(RELICS[c]){p.relics.push(c);log(`${nm(p)} opens a nook and finds the ${rl(c)}!`);toast(`The ${RELICS[c]}!`,`<p>${nm(p)} has ${p.relics.length} relic${p.relics.length>1?'s':''}.${p.relics.length>=NEED?' Now for the gate!':''}</p>`)}
+  else if(c==='boots'){p.items.boots=true;S.ap+=1;log(`${nm(p)} pulls on a pair of <b>Stompy Boots</b>: +1 AP every turn.`);toast('Stompy Boots','<p>+1 action point every turn, starting now.</p>')}
+  else if(c==='fork'){p.items.fork=true;log(`${nm(p)} finds a <b>Gnarly Fork</b>: +2 in fights.`);toast('Gnarly Fork','<p>+2 on every fight and jostle roll.</p>')}
+  else{S.ap=0;log(`${nm(p)} opens a nook full of <b>Gloop</b> and is stuck for the rest of the turn.`);toast('Gloop!','<p>Stuck fast. Your turn is over.</p>',true)}
+  for(const q of S.players)delete q.known[idx(p.x,p.y)];
+  after();return true;
+}
+function actJostle(q){
+  const p=cur();if(S.jostled||S.ap<1||q.x!==p.x||q.y!==p.y||q===p)return false;
+  S.ap-=1;S.jostled=true;const a=d6(),b=d6(),ps=a+might(p),qs=b+might(q);const won=ps>qs;
+  let stole=null;if(won&&q.relics.length){stole=takeRandom(q.relics);p.relics.push(stole)}
+  toast(won?`${HEROES[p.hero].short} shoves!`:`${HEROES[q.hero].short} holds firm`,
+    `<div class="dicerow"><span class="die">${a}</span><small>+${might(p)} = ${ps}</small><small>vs</small><span class="die">${b}</span><small>+${might(q)} = ${qs}</small></div><p>${stole?`Snatched the ${RELICS[stole]}!`:won?'…but there was nothing to grab.':'No luck.'}</p>`,!won);
+  log(stole?`${nm(p)} jostles ${nm(q)} and snatches the ${rl(stole)}.`:`${nm(p)} jostles ${nm(q)}${won?' but finds empty pockets':', who doesn\'t budge'}.`);
+  checkWin(p);after();return true;
+}
+function doHop(p,d){const D=DIRS[d],nx=p.x+D.dx,ny=p.y+D.dy;if(!inB(nx,ny))return false;consumeCard(p,'hop');log(`${nm(p)} plays <b>Hop-Skip</b> and bounds over the hedge.`);p.x=nx;p.y=ny;enterTile(p);after();return true}
+function doButter(p,q){
+  if(!q.relics.length)return false;consumeCard(p,'butter');const r=takeRandom(q.relics);tileAt(q.x,q.y).ground.push(r);
+  log(`${nm(p)} plays <b>Butterfingers</b>. ${nm(q)} fumbles the ${rl(r)} onto the ground.`);toast('Butterfingers!',`<p>${nm(q)} drops the ${RELICS[r]}.</p>`,true);after();return true;
+}
+function monsterPass(x,y,d){if(!connected(x,y,d))return false;return !isGate(x+DIRS[d].dx,y+DIRS[d].dy)}
+function bfs(x,y,pass,maxD){
+  const dist=Array(N*N).fill(INF),prev=Array(N*N).fill(-1);const q=[idx(x,y)];dist[q[0]]=0;
+  while(q.length){const u=q.shift();if(dist[u]>=maxD)continue;const ux=u%N,uy=(u/N)|0;for(let d=0;d<4;d++){if(!pass(ux,uy,d))continue;const v=idx(ux+DIRS[d].dx,uy+DIRS[d].dy);if(dist[v]<INF)continue;dist[v]=dist[u]+1;prev[v]=u;q.push(v)}}
+  return{dist,prev};
+}
+function monsterReach(m){const{dist}=bfs(m.x,m.y,monsterPass,3);const s=new Set();dist.forEach((v,i)=>{if(v>0&&v<=3)s.add(i)});return s}
+function doWhistle(p,mi,x,y){
+  const m=S.monsters[mi];consumeCard(p,'whistle');m.last=[m.x,m.y];m.x=x;m.y=y;
+  log(`${nm(p)} blows the <b>Monster Whistle</b>. ${mn(m)} comes stomping.`);
+  for(const h of heroesAt(x,y)){if(fight(h,m))break}
+  after();return true;
+}
+
+// ---------- monsters ----------
+function monsterNext(m){
+  const{dist,prev}=bfs(m.x,m.y,monsterPass,6);
+  let best=-1,bd=INF;for(const h of S.players){const i=idx(h.x,h.y);if(dist[i]>0&&dist[i]<bd){bd=dist[i];best=i}}
+  if(best>=0){let c=best;while(prev[c]!==idx(m.x,m.y))c=prev[c];return[c%N,(c/N)|0]}
+  const opts=[];for(let d=0;d<4;d++)if(monsterPass(m.x,m.y,d))opts.push([m.x+DIRS[d].dx,m.y+DIRS[d].dy]);
+  if(!opts.length)return null;
+  const fresh=opts.filter(o=>!m.last||o[0]!==m.last[0]||o[1]!==m.last[1]);
+  return pick(fresh.length?fresh:opts);
+}
+async function monsterPhase(){
+  S.phase='monsters';const tok=++S.token;render();
+  log('<span class="mon">The monsters stir…</span>');
+  for(const m of S.monsters){
+    const steps=1+Math.floor(Math.random()*3);
+    for(let s=0;s<steps;s++){
+      await wait(340);if(tok!==S.token)return;
+      const n=monsterNext(m);if(!n)break;
+      m.last=[m.x,m.y];m.x=n[0];m.y=n[1];render();
+      const hs=heroesAt(m.x,m.y);
+      if(hs.length){for(const h of hs){const w=fight(h,m);render();await waitToast();if(tok!==S.token)return;if(w)break}break}
+    }
+  }
+  await wait(250);if(tok!==S.token)return;
+  S.phase='play';S.round++;startTurn(0);
+}
+
+// ---------- computer players ----------
+function edgeCost(p,x,y,d){
+  const D=DIRS[d],nx=x+D.dx,ny=y+D.dy;if(!inB(nx,ny))return INF;
+  const A=tileAt(x,y),B=tileAt(nx,ny);
+  const ra=(mask(A)&D.b)?0:(A.fixed?INF:minRot(A,D.b));
+  const rb=(mask(B)&D.o)?0:(B.fixed?INF:minRot(B,D.o));
+  let c=Math.min(INF,1+ra+rb);
+  if(p.hero==='pip')c=Math.min(c,2);
+  if(c<INF&&S.monsters.some(m=>m.x===nx&&m.y===ny)&&!p.brave&&might(p)<2)c+=6;
+  return c;
+}
+function dijkstra(p){
+  const n=N*N,dist=Array(n).fill(INF),prev=Array(n).fill(-1),done=Array(n).fill(false);dist[idx(p.x,p.y)]=0;
+  for(;;){let u=-1,b=INF;for(let i=0;i<n;i++)if(!done[i]&&dist[i]<b){b=dist[i];u=i}if(u<0)break;done[u]=true;
+    const ux=u%N,uy=(u/N)|0;for(let d=0;d<4;d++){const c=edgeCost(p,ux,uy,d);if(c>=INF)continue;const v=idx(ux+DIRS[d].dx,uy+DIRS[d].dy);if(dist[u]+c<dist[v]){dist[v]=dist[u]+c;prev[v]=u}}}
+  return{dist,prev};
+}
+function aiTargets(p){
+  const gi=idx(GATE[0],GATE[1]);if(p.relics.length>=NEED)return[{i:gi,bias:0}];
+  const T=[];
+  S.tiles.forEach((t,i)=>{if(t.ground.length)T.push({i,bias:-1});if(t.nook&&!t.nook.searched){const k=p.known[i];if(k==='gloop')return;T.push({i,bias:k?(RELICS[k]?-1.5:0.5):0})}});
+  for(const q of S.players)if(q!==p&&q.relics.length)T.push({i:idx(q.x,q.y),bias:3});
+  if(!T.length)T.push({i:gi,bias:0});
+  return T;
+}
+function aiStep(){
+  const p=cur(),opp=S.players.filter(q=>q!==p),has=c=>p.hand.includes(c);
+  if(has('pie')&&S.ap>0){consumeCard(p,'pie');S.ap+=2;log(`${nm(p)} wolfs down a <b>Second Breakfast</b>: +2 AP.`);after();return true}
+  if(has('pants')&&!p.brave){consumeCard(p,'pants');p.brave=true;log(`${nm(p)} pulls on the <b>Brave Pants</b>.`);after();return true}
+  const rich=opp.filter(q=>q.relics.length).sort((a,b)=>b.relics.length-a.relics.length);
+  if(has('butter')&&rich.length)return doButter(p,rich[0]);
+  if(has('whistle')){const tgt=rich.filter(q=>!isGate(q.x,q.y));for(const q of tgt){for(let mi=0;mi<S.monsters.length;mi++){if(monsterReach(S.monsters[mi]).has(idx(q.x,q.y)))return doWhistle(p,mi,q.x,q.y)}}}
+  const here=idx(p.x,p.y),t=tileAt(p.x,p.y);
+  if(S.ap>=1&&t.nook&&!t.nook.searched&&p.known[here]!=='gloop')return actSearch();
+  if(S.ap>=1&&!S.jostled&&p.relics.length<NEED){const q=opp.find(q=>q.x===p.x&&q.y===p.y&&q.relics.length);if(q)return actJostle(q)}
+  if(S.ap<1&&!has('hop')&&!S.freeTwist)return false;
+  let next=-1;
+  if(S.commit&&S.commit.from===here&&edgeCost(p,p.x,p.y,dirTo(p.x,p.y,S.commit.to%N,(S.commit.to/N)|0))<INF)next=S.commit.to;
+  else{
+    const{dist,prev}=dijkstra(p);let best=null;
+    for(const g of aiTargets(p)){if(g.i===here)continue;const v=dist[g.i]+g.bias;if(dist[g.i]<INF&&(!best||v<best.v))best={...g,v}}
+    if(!best)return false;
+    let c=best.i;while(prev[c]!==here&&prev[c]>=0)c=prev[c];next=c;S.commit={from:here,to:next};
+  }
+  const nx=next%N,ny=(next/N)|0,d=dirTo(p.x,p.y,nx,ny);if(d<0)return false;
+  if(connected(p.x,p.y,d)){if(S.ap>=1)return actMove(d);if(has('hop'))return doHop(p,d);return false}
+  const D=DIRS[d],A=t,B=tileAt(nx,ny);
+  const ra=(mask(A)&D.b)?0:minRot(A,D.b),rb=(mask(B)&D.o)?0:minRot(B,D.o);
+  if(has('hop'))return doHop(p,d);
+  if(has('spin')&&(ra>1||rb>1)){consumeCard(p,'spin');const T=rb>1?B:A;T.rot+=(T===B?rb:ra);log(`${nm(p)} plays <b>Big Spin</b> and wrenches a tile round.`);after();return true}
+  if(p.hero==='pip'&&S.ap>=2)return actMove(d,true);
+  if(S.ap<1&&!S.freeTwist)return false;
+  if(ra>0&&ra<INF&&!A.fixed)return actTwist(p.x,p.y);
+  if(rb>0&&rb<INF&&!B.fixed)return actTwist(nx,ny);
+  return false;
+}
+async function runAI(tok){
+  await wait(650);let guard=0;
+  while(S.phase==='play'&&tok===S.token&&cur().ctrl==='ai'&&guard++<40){
+    const did=aiStep();render();if(!did)break;
+    await wait(Math.max(520,toastUntil-Date.now()+220));
+  }
+  if(S.phase==='play'&&tok===S.token){await wait(250);if(tok===S.token)endTurn()}
+}
+
+// ---------- human input ----------
+function after(){save();render()}
+function humanTurn(){return S&&S.phase==='play'&&cur().ctrl==='human'}
+function onTile(x,y){
+  if(!humanTurn())return;const p=cur(),pd=S.pending;
+  if(pd){
+    if(pd.card==='hop'){const d=dirTo(p.x,p.y,x,y);if(d>=0){S.pending=null;doHop(p,d)}return}
+    if(pd.card==='spin'){const t=tileAt(x,y);if(t.fixed){setHint('That tile is rooted in place. Pick a loose one.');return}
+      if(pd.tile==null||pd.tile===idx(x,y)){pd.tile=idx(x,y);t.rot++;render()}else setHint('Big Spin turns one tile. Press <b>Done</b> to finish with this one.');return}
+    if(pd.card==='whistle'){
+      if(pd.mi==null){const mi=S.monsters.findIndex(m=>m.x===x&&m.y===y);if(mi>=0){pd.mi=mi;render()}return}
+      if(monsterReach(S.monsters[pd.mi]).has(idx(x,y))){const mi=pd.mi;S.pending=null;doWhistle(p,mi,x,y)}
+      else{const mi=S.monsters.findIndex(m=>m.x===x&&m.y===y);if(mi>=0){pd.mi=mi;render()}}
+      return}
+    if(pd.card==='butter'){const q=S.players.find(q=>q!==p&&q.x===x&&q.y===y&&q.relics.length);if(q){S.pending=null;doButter(p,q)}return}
+    return;
+  }
+  if(S.mode==='twist'){if(canTwist(p,x,y))actTwist(x,y);else if(!tileAt(x,y).fixed)setHint('You can only twist your own tile or one right next to you.');return}
+  const d=dirTo(p.x,p.y,x,y);if(d<0)return;
+  if(connected(p.x,p.y,d)){if(S.ap>=1)actMove(d);else setHint('Out of action points. Play a card or end your turn.');return}
+  if(p.hero==='pip'&&S.ap>=2){actMove(d,true);return}
+  setHint('A hedge is in the way. Switch to <b>Twist</b> to line up the paths.');
+}
+function playCardUI(c){
+  if(!humanTurn()||S.pending)return;const p=cur();
+  if(c==='pie'){consumeCard(p,'pie');S.ap+=2;log(`${nm(p)} wolfs down a <b>Second Breakfast</b>: +2 AP.`);after();return}
+  if(c==='pants'){if(p.brave){setHint('You are already wearing the Brave Pants.');return}consumeCard(p,'pants');p.brave=true;log(`${nm(p)} pulls on the <b>Brave Pants</b>.`);after();return}
+  if(c==='butter'&&!S.players.some(q=>q!==p&&q.relics.length)){setHint('Nobody is carrying a relic yet.');return}
+  S.pending={card:c,tile:null,mi:null};render();
+}
+let hintOverride=null;
+function setHint(h){hintOverride=h;renderHint();clearTimeout(setHint.t);setHint.t=setTimeout(()=>{hintOverride=null;renderHint()},3200)}
+
+// ---------- rendering: DOM ----------
+function render(){if(!S)return;renderTurn();renderActions();renderHand();renderRoster();renderLog();renderHint()}
+function ico(kind,id,size,title){return`<canvas class="ico" data-ico="${kind}:${id}" data-size="${size}" width="${size}" height="${size}" style="width:${size}px;height:${size}px"${title?` title="${title}" aria-label="${title}" role="img"`:''}></canvas>`}
+function renderTurn(){
+  const el=$('#turnCard');
+  if(S.phase==='setup'){el.innerHTML=`<div>${ico('hero','zizi',64)}</div><div><div class="who">Set up a game</div><div class="sub">Choose who plays each hero.</div></div>`;paint(el);return}
+  if(S.phase==='over'){const w=S.players[S.winner];el.innerHTML=`<div>${ico('hero',w.hero,64)}</div><div><div class="who" style="color:${HEROES[w.hero].color}">${HEROES[w.hero].short} escaped!</div><div class="sub">Game over after ${S.round} round${S.round>1?'s':''}.</div></div>`;paint(el);return}
+  if(S.phase==='monsters'){el.innerHTML=`<div>${ico('mon','snout',64)}</div><div><div class="who mon">Monster time</div><div class="sub">The monsters lumber about.</div></div><div class="aprow"><span class="round">Round ${S.round}</span></div>`;paint(el);return}
+  const p=cur(),H=HEROES[p.hero];const max=Math.max(S.ap,3+(p.items.boots?1:0));
+  let pips='';for(let i=0;i<max;i++)pips+=`<span class="pip${i<S.ap?' on':''}"></span>`;
+  el.innerHTML=`<div>${ico('hero',p.hero,64)}</div><div><div class="who" style="color:${H.color}">${H.name}</div><div class="sub">${p.ctrl==='ai'?'Computer is thinking…':'Your move'}${p.brave?' · wearing Brave Pants':''}</div></div>
+  <div class="aprow"><span class="lbl">Action points</span>${pips}${S.freeTwist?'<span class="sub">+ free twist</span>':''}<span class="round">Round ${S.round}</span></div>
+  <div class="abil"><b>${H.ability}.</b> ${H.text}</div>`;paint(el);
+}
+function renderActions(){
+  const el=$('#actions');
+  if(S.phase==='setup'){el.innerHTML=`<p class="status">Pick the players to begin.</p><button class="btn primary wide" data-act="setup" type="button">Choose players</button>`;return}
+  if(S.phase==='over'){el.innerHTML=`<button class="btn primary wide" data-act="again" type="button">Play again</button><button class="btn wide" data-act="setup" type="button">Change players</button>`;return}
+  if(S.phase==='monsters'){el.innerHTML=`<p class="status">Hold tight while the monsters move.</p>`;return}
+  const p=cur();
+  if(p.ctrl==='ai'){el.innerHTML=`<p class="status"><b>${HEROES[p.hero].short}</b> is plotting a route…</p>`;return}
+  const pd=S.pending;
+  if(pd){
+    let txt='',extra='';
+    if(pd.card==='hop')txt='Tap any tile next to you to hop there.';
+    if(pd.card==='spin')txt=pd.tile==null?'Tap a loose tile to turn it.':'Tap it again to keep turning. Press Done when it faces the right way.';
+    if(pd.card==='whistle')txt=pd.mi==null?'Tap a monster to call.':`Tap a glowing tile to send ${MONSTERS[S.monsters[pd.mi].type].name} there.`;
+    if(pd.card==='butter'){txt='Who fumbles a relic?';extra=S.players.filter(q=>q!==p&&q.relics.length).map(q=>`<button class="btn" data-butter="${S.players.indexOf(q)}" type="button">${HEROES[q.hero].short} (${q.relics.length})</button>`).join('')}
+    el.innerHTML=`<p class="status"><b>${CARDS[pd.card].name}.</b> ${txt}</p>${extra}${pd.card==='spin'?`<button class="btn primary" data-act="spindone" type="button" ${pd.tile==null?'disabled':''}>Done</button>`:''}<button class="btn${pd.card==='spin'?'':' wide'}" data-act="cancel" type="button" ${pd.card==='spin'&&pd.tile!=null?'disabled':''}>Cancel</button>`;
+    return;
+  }
+  const t=tileAt(p.x,p.y);const canSearch=t.nook&&!t.nook.searched&&S.ap>=1;
+  const others=S.players.filter(q=>q!==p&&q.x===p.x&&q.y===p.y);
+  const jb=others.length?others.map(q=>`<button class="btn" data-jostle="${S.players.indexOf(q)}" type="button" ${S.jostled||S.ap<1?'disabled':''}>Jostle ${HEROES[q.hero].short}</button>`).join(''):`<button class="btn" type="button" disabled>Jostle</button>`;
+  const stuck=S.ap<1&&!S.freeTwist;
+  el.innerHTML=`<div class="seg" role="group" aria-label="Board mode"><button data-mode="move" aria-pressed="${S.mode==='move'}" type="button">Walk</button><button data-mode="twist" aria-pressed="${S.mode==='twist'}" type="button">Twist</button></div>
+  <button class="btn" data-act="search" type="button" ${canSearch?'':'disabled'}>Search nook</button>${jb}
+  <button class="btn primary wide${stuck?' pulse':''}" data-act="end" type="button">End turn</button>`;
+}
+function renderHand(){
+  const el=$('#hand');if(S.phase==='setup'){el.innerHTML='<h3>Trick cards</h3><p class="empty">Each hero starts with one trick card.</p>';return}
+  const p=S.phase==='play'?cur():null;
+  if(!p||p.ctrl==='ai'){const n=p?p.hand.length:0;el.innerHTML=`<h3>Trick cards</h3>${p?`<p class="empty">${HEROES[p.hero].short} holds ${n} card${n===1?'':'s'}, face down.</p>`:'<p class="empty">Waiting for the next hero.</p>'}`;return}
+  el.innerHTML=`<h3>Your trick cards</h3>${p.hand.length?`<div class="cards">${p.hand.map(c=>`<button class="card" data-card="${c}" type="button" ${S.pending?'disabled':''}><span class="cn">${CARDS[c].name}</span><span class="ct">${CARDS[c].text}</span></button>`).join('')}</div>`:'<p class="empty">No cards. You draw one at the start of each turn.</p>'}`;
+}
+function renderRoster(){
+  const el=$('#roster');
+  el.innerHTML=`<h3>Heroes</h3><div class="rows">${S.players.map((p,i)=>{
+    const chips=[...p.relics.map(r=>ico('relic',r,22,RELICS[r])),p.items.boots?ico('relic','boots',22,'Stompy Boots'):'',p.items.fork?ico('relic','fork',22,'Gnarly Fork'):''].join('');
+    return`<div class="row${S.phase==='play'&&i===S.turn?' cur':''}">${ico('hero',p.hero,36)}<div><div class="nm" style="color:${HEROES[p.hero].color}">${HEROES[p.hero].short}</div><div class="ctl">${p.ctrl==='ai'?'Computer':'Human'} · ${p.relics.length}/${NEED} relics</div></div><div class="chips">${chips}<span class="cnt">${p.hand.length} card${p.hand.length===1?'':'s'}</span></div></div>`}).join('')}</div>`;
+  paint(el);
+}
+function renderLog(){$('#log').innerHTML=S.log.map(e=>`<li><span class="r">R${e.r}</span>${e.h}</li>`).join('')||'<li>Nothing has happened yet.</li>'}
+function renderHint(){
+  const el=$('#hint');if(hintOverride){el.innerHTML=hintOverride;return}
+  let h='';
+  if(S.phase==='setup')h='A fresh maze is laid out. Choose your players to begin.';
+  else if(S.phase==='over')h='The gate has closed behind the winner.';
+  else if(S.phase==='monsters')h='The monsters are on the move.';
+  else{const p=cur();
+    if(p.ctrl==='ai')h=`${HEROES[p.hero].short} is taking a turn.`;
+    else if(S.pending)h='';
+    else if(S.ap<1&&!S.freeTwist)h='Out of action points. Play a free card or press <b>End turn</b>.';
+    else if(p.relics.length>=NEED)h='You have three relics. Get to the <b>Snoring Gate</b> in the middle!';
+    else if(S.mode==='twist')h='Tap your tile or a neighbour to turn it a quarter turn.';
+    else{const t=tileAt(p.x,p.y);h=t.nook&&!t.nook.searched?'There is a nook door here. Press <b>Search nook</b> to open it.':'Tap a glowing tile to walk, or switch to <b>Twist</b> to turn tiles.'+(p.hero==='pip'?' Red-dashed tiles can be dug into for 2 AP.':'')}
+  }
+  el.innerHTML=h;
+}
+
+// ---------- modal sheets ----------
+const modal=$('#modal'),sheet=$('#sheet');
+let sheetBack=null;
+function openSheet(html){sheet.innerHTML=html;paint(sheet);modal.hidden=false;const f=sheet.querySelector('.primary')||sheet.querySelector('button');if(f)f.focus({preventScroll:true})}
+function closeSheet(){modal.hidden=true}
+function showSetup(){
+  const saved=loadSave(),active=S&&(S.phase==='play'||S.phase==='monsters');
+  openSheet(`<h2>Who's heading into the hollow?</h2><p class="lede">Choose a human or computer player for each hero. You need at least two heroes. Several humans can share one screen and pass it around.</p>
+  <div class="seats">${HERO_ORDER.map((h,i)=>{const H=HEROES[h];return`<div class="seat">${ico('hero',h,64)}<div class="seat-info" style="min-width:0"><div class="seat-name" style="color:${H.color}">${H.name}</div><div class="seat-kind">${H.kind}</div><div class="seat-abil"><b>${H.ability}.</b> ${H.text}</div></div><select id="seat-${i}" aria-label="${H.name}"><option value="human">Human</option><option value="ai">Computer</option><option value="off">Not playing</option></select></div>`}).join('')}</div>
+  <p class="err" id="setupErr" hidden></p>
+  <div class="sheet-actions">${active?'<button class="btn" data-sheet="close" type="button">Back to game</button>':saved?'<button class="btn" data-sheet="resume" type="button">Continue saved game</button>':''}<button class="btn" data-sheet="rules" type="button">How to play</button><button class="btn primary" data-sheet="start" type="button">Start the adventure</button></div>`);
+  HERO_ORDER.forEach((h,i)=>{$('#seat-'+i).value=seatCfg[i].ctrl});
+  sheetBack=showSetup;
+}
+function showRules(back){
+  sheetBack=back;
+  openSheet(`<div class="rules"><h2>How to play</h2>
+  <p>Somewhere in the hedges of Twistyhollow, twelve little nook doors hide eight odd relics. Find <b>three relics</b> and carry them to the <b>Snoring Gate</b> in the middle of the maze. The first hero through wins.</p>
+  <div class="legend"><span>${ico('relic','nook',26)}Nook door</span><span>${ico('relic','gate',26)}Snoring Gate</span>${RELIC_IDS.map(r=>`<span>${ico('relic',r,26)}${RELICS[r]}</span>`).join('')}</div>
+  <h3>Your turn</h3><p>You get <b>3 action points</b>. Spend them in any order:</p>
+  <ul><li><b>Walk (1 AP).</b> Step to a neighbouring tile, but only where the two paths meet.</li>
+  <li><b>Twist (1 AP).</b> Turn your own tile or a neighbouring tile a quarter turn. The corner homes and the gate never turn.</li>
+  <li><b>Search (1 AP).</b> Open the nook door on your tile. Inside: a relic, Stompy Boots (+1 AP every turn), a Gnarly Fork (+2 in fights), or Gloop (your turn ends).</li>
+  <li><b>Jostle (1 AP, once a turn).</b> Shove another hero on your tile. You each roll a die and add your fight bonus. Roll higher and you snatch one of their relics.</li></ul>
+  <h3>Trick cards</h3><p>Draw one at the start of your turn when you hold fewer than three (you can hold four). Most cost no AP: hop over a hedge, spin a far tile, whistle up a monster, make a rival drop a relic, eat a second breakfast, or put on the Brave Pants.</p>
+  <h3>Monsters</h3><p>After every hero has had a turn, each monster lumbers 1 to 3 steps, hunting the nearest hero. Monsters can never enter the Snoring Gate. When a hero and a monster meet, both roll a die and add their bonus, and <b>the hero wins ties</b>. Win and the monster flees somewhere far off, and you pick up a trick card. Lose and you drop a relic on the spot and your turn ends. Relics lying on the ground are scooped up by whoever walks in next.</p>
+  <h3>Controls</h3><p>Tap a glowing tile to walk there, or use the arrow keys. Switch to <b>Twist</b> to turn tiles. Your game saves in this browser as you play.</p></div>
+  <div class="sheet-actions"><button class="btn primary" data-sheet="back" type="button">${back?'Back':'Got it'}</button></div>`);
+}
+function showVictory(){
+  if(!S||S.phase!=='over')return;const w=S.players[S.winner],H=HEROES[w.hero];
+  openSheet(`<div class="win">${ico('hero',w.hero,120)}<h2 style="color:${H.color}">${H.name} escapes!</h2><p class="lede">Out through the Snoring Gate in round ${S.round}, clutching the ${listJoin(w.relics.map(r=>RELICS[r]))}. ${w.ctrl==='ai'?'Better luck next time.':'Well played!'}</p></div>
+  <div class="sheet-actions"><button class="btn" data-sheet="close" type="button">Look at the board</button><button class="btn" data-sheet="setup" type="button">Change players</button><button class="btn primary" data-sheet="again" type="button">Play again</button></div>`);
+  sheetBack=null;
+}
+sheet.addEventListener('click',e=>{
+  const b=e.target.closest('[data-sheet]');if(!b)return;const a=b.dataset.sheet;
+  if(a==='start'){const cfg=HERO_ORDER.map((h,i)=>({ctrl:$('#seat-'+i).value}));const n=cfg.filter(c=>c.ctrl!=='off').length;
+    if(n<2){const er=$('#setupErr');er.textContent='Pick at least two heroes to play.';er.hidden=false;return}
+    seatCfg=cfg;closeSheet();newGame(seatCfg,false)}
+  else if(a==='resume'){const s=loadSave();closeSheet();if(s)resume(s)}
+  else if(a==='rules')showRules(showSetup);
+  else if(a==='back'){if(sheetBack)sheetBack();else closeSheet()}
+  else if(a==='close')closeSheet();
+  else if(a==='setup')showSetup();
+  else if(a==='again'){closeSheet();newGame(seatCfg,false)}
+});
+modal.addEventListener('click',e=>{if(e.target===modal&&S&&S.phase!=='setup')closeSheet()});
+$('#btnRules').addEventListener('click',()=>showRules(modal.hidden?null:sheetBack));
+$('#btnNew').addEventListener('click',showSetup);
+$('#actions').addEventListener('click',e=>{
+  const b=e.target.closest('button');if(!b||b.disabled)return;
+  if(b.dataset.mode){if(humanTurn()){S.mode=b.dataset.mode;render()}return}
+  if(b.dataset.jostle){if(humanTurn())actJostle(S.players[+b.dataset.jostle]);return}
+  if(b.dataset.butter){if(humanTurn()){S.pending=null;doButter(cur(),S.players[+b.dataset.butter])}return}
+  const a=b.dataset.act;
+  if(a==='setup')showSetup();else if(a==='again')newGame(seatCfg,false);
+  else if(!humanTurn())return;
+  else if(a==='search')actSearch();else if(a==='end')endTurn();
+  else if(a==='cancel'){S.pending=null;render()}
+  else if(a==='spindone'){const p=cur();consumeCard(p,'spin');log(`${nm(p)} plays <b>Big Spin</b> and wrenches a tile round.`);S.pending=null;after()}
+});
+$('#hand').addEventListener('click',e=>{const b=e.target.closest('[data-card]');if(b&&!b.disabled)playCardUI(b.dataset.card)});
+document.addEventListener('keydown',e=>{
+  if(!modal.hidden||!humanTurn()||S.pending)return;if(e.target.closest&&e.target.closest('select'))return;
+  const d=DIRS.findIndex(D=>D.k===e.key);if(d<0)return;e.preventDefault();const p=cur();onTile(p.x+DIRS[d].dx,p.y+DIRS[d].dy);
+});
+
+// ---------- rendering: canvas art ----------
+const canvas=$('#board'),bctx=canvas.getContext('2d');let cssW=0,dpr=1;
+function resize(){const r=canvas.getBoundingClientRect();cssW=r.width;dpr=Math.min(2.5,window.devicePixelRatio||1);canvas.width=Math.round(cssW*dpr);canvas.height=Math.round(cssW*dpr)}
+new ResizeObserver(resize).observe($('#boardWrap'));
+function geo(){const m=cssW*0.025;return{m,ts:(cssW-2*m)/N}}
+canvas.addEventListener('click',e=>{const r=canvas.getBoundingClientRect(),{m,ts}=geo();const x=Math.floor((e.clientX-r.left-m)/ts),y=Math.floor((e.clientY-r.top-m)/ts);if(inB(x,y))onTile(x,y)});
+
+const anim={tile:[],piece:{},reset(){this.tile=[];this.piece={}}};
+function rr(ctx,x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath()}
+function circ(ctx,x,y,r){ctx.beginPath();ctx.arc(x,y,r,0,TAU)}
+function ell(ctx,x,y,a,b,rot=0){ctx.beginPath();ctx.ellipse(x,y,a,b,rot,0,TAU)}
+function fs(ctx,fill){ctx.fillStyle=fill;ctx.fill();ctx.stroke()}
+function dot(ctx,x,y,r,c=INK){circ(ctx,x,y,r);ctx.fillStyle=c;ctx.fill()}
+function starPath(ctx,x,y,R,r,n=5,rot=-Math.PI/2){ctx.beginPath();for(let i=0;i<n*2;i++){const a=rot+i*Math.PI/n,q=i%2?r:R;ctx.lineTo(x+Math.cos(a)*q,y+Math.sin(a)*q)}ctx.closePath()}
+function eyeW(ctx,x,y,r,px=0,py=0){circ(ctx,x,y,r);fs(ctx,'#fbfbf4');dot(ctx,x+px*r*0.35,y+py*r*0.35,r*0.48)}
+
+function drawHero(ctx,id,x,y,r){
+  const c=HEROES[id].color;ctx.save();ctx.translate(x,y);ctx.lineWidth=Math.max(1.2,r*0.09);ctx.strokeStyle=INK;ctx.lineJoin='round';ctx.lineCap='round';
+  ctx.fillStyle='rgba(0,0,0,.3)';ell(ctx,0,r*0.82,r*0.82,r*0.26);ctx.fill();
+  if(id==='pip'){
+    ell(ctx,0,r*0.12,r*0.84,r*0.78);fs(ctx,c);
+    ctx.beginPath();ctx.moveTo(-r*0.5,r*0.75);ctx.lineTo(-r*0.38,r*0.95);ctx.moveTo(-r*0.3,r*0.78);ctx.lineTo(-r*0.22,r*0.98);ctx.moveTo(r*0.5,r*0.75);ctx.lineTo(r*0.38,r*0.95);ctx.moveTo(r*0.3,r*0.78);ctx.lineTo(r*0.22,r*0.98);ctx.strokeStyle='#f6efe0';ctx.stroke();ctx.strokeStyle=INK;
+    ctx.beginPath();ctx.moveTo(0,-r*0.82);ctx.quadraticCurveTo(r*0.45,-r*1.45,r*0.85,-r*1.05);ctx.quadraticCurveTo(r*0.4,-r*1.05,r*0.08,-r*0.78);ctx.closePath();fs(ctx,'#d8344f');
+    ctx.beginPath();ctx.arc(0,-r*0.18,r*0.66,Math.PI,0);ctx.closePath();fs(ctx,'#b9c3c8');
+    ctx.beginPath();ctx.moveTo(-r*0.66,-r*0.18);ctx.lineTo(r*0.66,-r*0.18);ctx.stroke();
+    dot(ctx,-r*0.26,r*0.06,r*0.08);dot(ctx,r*0.26,r*0.06,r*0.08);
+    ell(ctx,0,r*0.34,r*0.22,r*0.15);fs(ctx,'#f4a0b0');
+  }else if(id==='wendle'){
+    ell(ctx,0,r*0.2,r*0.92,r*0.7);fs(ctx,c);
+    ell(ctx,0,r*0.42,r*0.55,r*0.32);ctx.fillStyle='#bfe0ff';ctx.fill();
+    eyeW(ctx,-r*0.5,-r*0.35,r*0.28,0.3,0.2);eyeW(ctx,r*0.5,-r*0.35,r*0.28,-0.3,0.2);
+    ctx.beginPath();ctx.moveTo(-r*0.26,-r*0.45);ctx.lineTo(r*0.26,-r*0.45);ctx.lineTo(r*0.1,-r*1.4);ctx.closePath();fs(ctx,'#2b3f8f');
+    starPath(ctx,r*0.02,-r*0.75,r*0.13,r*0.06);ctx.fillStyle='#f5d75a';ctx.fill();
+    ctx.beginPath();ctx.arc(0,r*0.02,r*0.42,0.25,Math.PI-0.25);ctx.stroke();
+  }else if(id==='marrow'){
+    const horn=(s)=>{ctx.beginPath();ctx.moveTo(s*r*0.3,-r*0.55);ctx.quadraticCurveTo(s*r*1.05,-r*1.15,s*r*0.85,-r*0.25);ctx.lineWidth=r*0.3;ctx.strokeStyle=INK;ctx.stroke();ctx.lineWidth=r*0.18;ctx.strokeStyle='#efe3c4';ctx.stroke();ctx.lineWidth=Math.max(1.2,r*0.09);ctx.strokeStyle=INK};
+    horn(-1);horn(1);
+    ell(ctx,-r*0.82,-r*0.05,r*0.28,r*0.13,0.4);fs(ctx,c);ell(ctx,r*0.82,-r*0.05,r*0.28,r*0.13,-0.4);fs(ctx,c);
+    ell(ctx,0,r*0.12,r*0.72,r*0.8);fs(ctx,c);
+    ctx.beginPath();ctx.moveTo(-r*0.22,r*0.55);ctx.lineTo(0,r*1.05);ctx.lineTo(r*0.22,r*0.55);ctx.closePath();fs(ctx,'#f6efe0');
+    circ(ctx,-r*0.27,-r*0.05,r*0.2);fs(ctx,'#fbfbf4');circ(ctx,r*0.27,-r*0.05,r*0.2);fs(ctx,'#fbfbf4');
+    ctx.fillStyle=INK;ctx.fillRect(-r*0.37,-r*0.08,r*0.2,r*0.07);ctx.fillRect(r*0.17,-r*0.08,r*0.2,r*0.07);
+    ctx.beginPath();ctx.moveTo(-r*0.07,-r*0.05);ctx.lineTo(r*0.07,-r*0.05);ctx.stroke();
+    ell(ctx,0,r*0.36,r*0.12,r*0.08);ctx.fillStyle='#6b3d5c';ctx.fill();
+  }else if(id==='zizi'){
+    ctx.beginPath();ctx.moveTo(-r*0.7,-r*0.3);ctx.lineTo(-r*0.62,-r*1.05);ctx.lineTo(-r*0.25,-r*0.62);ctx.closePath();fs(ctx,c);
+    ctx.beginPath();ctx.moveTo(r*0.7,-r*0.3);ctx.lineTo(r*0.62,-r*1.05);ctx.lineTo(r*0.25,-r*0.62);ctx.closePath();fs(ctx,c);
+    ell(ctx,0,r*0.1,r*0.8,r*0.85);fs(ctx,c);
+    circ(ctx,-r*0.32,-r*0.18,r*0.33);fs(ctx,'#fff3b0');circ(ctx,r*0.32,-r*0.18,r*0.33);fs(ctx,'#fff3b0');
+    dot(ctx,-r*0.3,-r*0.16,r*0.15);dot(ctx,r*0.3,-r*0.16,r*0.15);dot(ctx,-r*0.26,-r*0.2,r*0.05,'#fff');dot(ctx,r*0.34,-r*0.2,r*0.05,'#fff');
+    ctx.beginPath();ctx.moveTo(-r*0.1,r*0.08);ctx.lineTo(r*0.1,r*0.08);ctx.lineTo(0,r*0.3);ctx.closePath();fs(ctx,'#e8833a');
+    starPath(ctx,0,r*0.6,r*0.22,r*0.15,8,0);fs(ctx,'#b98a2c');dot(ctx,0,r*0.6,r*0.07);
+    dot(ctx,-r*0.55,r*0.4,r*0.04);dot(ctx,r*0.55,r*0.4,r*0.04);
+  }
+  ctx.restore();
+}
+function drawMonster(ctx,id,x,y,r){
+  ctx.save();ctx.translate(x,y);ctx.lineWidth=Math.max(1.2,r*0.09);ctx.strokeStyle=INK;ctx.lineJoin='round';ctx.lineCap='round';
+  ctx.fillStyle='rgba(0,0,0,.35)';ell(ctx,0,r*0.82,r*0.9,r*0.26);ctx.fill();
+  if(id==='snout'){
+    circ(ctx,-r*0.45,-r*0.5,r*0.3);fs(ctx,'#76604f');circ(ctx,r*0.05,-r*0.68,r*0.32);fs(ctx,'#76604f');circ(ctx,r*0.5,-r*0.45,r*0.28);fs(ctx,'#76604f');
+    ell(ctx,0,r*0.1,r*0.95,r*0.75);fs(ctx,'#86705d');
+    ell(ctx,0,r*0.3,r*0.38,r*0.26);fs(ctx,'#c99a8a');dot(ctx,-r*0.12,r*0.3,r*0.06);dot(ctx,r*0.12,r*0.3,r*0.06);
+    ctx.beginPath();ctx.moveTo(-r*0.35,r*0.45);ctx.quadraticCurveTo(-r*0.55,r*0.3,-r*0.5,r*0.05);ctx.lineTo(-r*0.38,r*0.35);ctx.closePath();fs(ctx,'#f6efe0');
+    ctx.beginPath();ctx.moveTo(r*0.35,r*0.45);ctx.quadraticCurveTo(r*0.55,r*0.3,r*0.5,r*0.05);ctx.lineTo(r*0.38,r*0.35);ctx.closePath();fs(ctx,'#f6efe0');
+    dot(ctx,-r*0.32,-r*0.12,r*0.1,'#ff5a3d');dot(ctx,r*0.32,-r*0.12,r*0.1,'#ff5a3d');
+    ctx.beginPath();ctx.moveTo(-r*0.5,-r*0.32);ctx.lineTo(-r*0.15,-r*0.18);ctx.moveTo(r*0.5,-r*0.32);ctx.lineTo(r*0.15,-r*0.18);ctx.stroke();
+  }else if(id==='sock'){
+    ctx.globalAlpha=0.94;ctx.beginPath();ctx.moveTo(-r*0.7,r*0.75);ctx.lineTo(-r*0.7,-r*0.3);ctx.arc(0,-r*0.3,r*0.7,Math.PI,0);ctx.lineTo(r*0.7,r*0.75);
+    for(let i=0;i<4;i++){const x0=r*0.7-i*r*0.35;ctx.quadraticCurveTo(x0-r*0.175,r*0.45,x0-r*0.35,r*0.75)}ctx.closePath();fs(ctx,'#e3ebf7');ctx.globalAlpha=1;
+    ctx.save();ctx.beginPath();ctx.arc(0,-r*0.3,r*0.66,Math.PI,0);ctx.lineTo(r*0.66,r*0.2);ctx.lineTo(-r*0.66,r*0.2);ctx.closePath();ctx.clip();
+    ctx.fillStyle='#d0506a';ctx.fillRect(-r,-r*0.78,r*2,r*0.14);ctx.fillRect(-r,-r*0.52,r*2,r*0.12);ctx.restore();
+    ell(ctx,-r*0.26,-r*0.08,r*0.14,r*0.2);ctx.fillStyle=INK;ctx.fill();ell(ctx,r*0.26,-r*0.08,r*0.14,r*0.2);ctx.fill();
+    ell(ctx,0,r*0.3,r*0.12,r*0.15);ctx.fill();
+  }else if(id==='hen'){
+    ctx.beginPath();ctx.moveTo(-r*0.15,r*0.7);ctx.lineTo(-r*0.2,r*1.0);ctx.moveTo(r*0.2,r*0.7);ctx.lineTo(r*0.25,r*1.0);ctx.strokeStyle='#e8833a';ctx.lineWidth=r*0.12;ctx.stroke();ctx.strokeStyle=INK;ctx.lineWidth=Math.max(1.2,r*0.09);
+    circ(ctx,-r*0.15,-r*0.85,r*0.17);fs(ctx,'#d63b3b');circ(ctx,r*0.1,-r*0.92,r*0.19);fs(ctx,'#d63b3b');circ(ctx,r*0.33,-r*0.8,r*0.15);fs(ctx,'#d63b3b');
+    ell(ctx,0,r*0.05,r*0.85,r*0.78);fs(ctx,'#8f8a3e');
+    ctx.beginPath();ctx.moveTo(-r*0.65,r*0.05);ctx.quadraticCurveTo(-r*0.2,r*0.65,r*0.15,r*0.2);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(r*0.55,-r*0.2);ctx.lineTo(r*1.05,-r*0.05);ctx.lineTo(r*0.55,r*0.12);ctx.closePath();fs(ctx,'#f0a33a');
+    eyeW(ctx,r*0.25,-r*0.3,r*0.2,0.6,0);
+    ctx.beginPath();ctx.moveTo(r*0.02,-r*0.58);ctx.lineTo(r*0.48,-r*0.42);ctx.lineWidth=r*0.12;ctx.stroke();
+    ell(ctx,r*0.6,r*0.15,r*0.08,r*0.13);ctx.fillStyle='#d63b3b';ctx.fill();
+  }
+  ctx.restore();
+}
+function drawRelic(ctx,id,x,y,r){
+  ctx.save();ctx.translate(x,y);ctx.lineWidth=Math.max(1,r*0.13);ctx.strokeStyle=INK;ctx.lineJoin='round';ctx.lineCap='round';
+  switch(id){
+    case'teapot':
+      ctx.beginPath();ctx.moveTo(r*0.45,r*0.05);ctx.quadraticCurveTo(r*0.95,0,r*0.95,-r*0.4);ctx.lineWidth=r*0.24;ctx.stroke();ctx.lineWidth=r*0.12;ctx.strokeStyle='#8fa6d6';ctx.stroke();ctx.strokeStyle=INK;ctx.lineWidth=Math.max(1,r*0.13);
+      ctx.beginPath();ctx.arc(-r*0.62,r*0.12,r*0.28,Math.PI*0.45,Math.PI*1.55);ctx.stroke();
+      ell(ctx,0,r*0.15,r*0.62,r*0.5);fs(ctx,'#8fa6d6');ell(ctx,0,-r*0.36,r*0.3,r*0.11);fs(ctx,'#6d83b5');dot(ctx,0,-r*0.5,r*0.09);
+      circ(ctx,-r*0.05,r*0.16,r*0.24);ctx.fillStyle='#f5d75a';ctx.fill();circ(ctx,r*0.06,r*0.08,r*0.21);ctx.fillStyle='#8fa6d6';ctx.fill();break;
+    case'star':
+      rr(ctx,-r*0.5,-r*0.45,r,r*1.12,r*0.22);fs(ctx,'#9fd1bf');rr(ctx,-r*0.58,-r*0.68,r*1.16,r*0.26,r*0.08);fs(ctx,'#8a5a33');
+      starPath(ctx,0,r*0.12,r*0.36,r*0.16);fs(ctx,'#f5d75a');break;
+    case'spoon':
+      ctx.save();ctx.rotate(-0.6);ctx.beginPath();ctx.moveTo(0,-r*0.1);ctx.lineTo(0,r*0.95);ctx.lineWidth=r*0.3;ctx.stroke();ctx.lineWidth=r*0.14;ctx.strokeStyle='#c8d0d6';ctx.stroke();ctx.strokeStyle=INK;ctx.lineWidth=Math.max(1,r*0.13);
+      ell(ctx,0,-r*0.42,r*0.3,r*0.42);fs(ctx,'#dfe5ea');ctx.restore();
+      ctx.beginPath();ctx.moveTo(r*0.7,-r*0.9);ctx.lineTo(r*0.7,-r*0.35);ctx.lineTo(r*0.95,-r*0.5);ctx.stroke();dot(ctx,r*0.58,-r*0.35,r*0.14);break;
+    case'jar':
+      rr(ctx,-r*0.52,-r*0.45,r*1.04,r*1.12,r*0.22);fs(ctx,'#5f6f98');rr(ctx,-r*0.58,-r*0.68,r*1.16,r*0.26,r*0.08);fs(ctx,'#3c4566');
+      ctx.beginPath();ctx.moveTo(r*0.12,-r*0.35);ctx.lineTo(-r*0.22,r*0.12);ctx.lineTo(r*0.02,r*0.12);ctx.lineTo(-r*0.12,r*0.55);ctx.lineTo(r*0.25,-r*0.02);ctx.lineTo(0,-r*0.02);ctx.closePath();fs(ctx,'#f5d75a');break;
+    case'crown':
+      ctx.beginPath();[[-0.75,0.1],[-0.75,-0.55],[-0.38,-0.15],[0,-0.7],[0.38,-0.15],[0.75,-0.55],[0.75,0.1]].forEach(([a,b])=>ctx.lineTo(a*r,b*r));ctx.closePath();fs(ctx,'#f0c23a');
+      rr(ctx,-r*0.8,r*0.05,r*1.6,r*0.48,r*0.14);fs(ctx,'#7d3ea6');dot(ctx,-r*0.4,r*0.29,r*0.08,'#f0c23a');dot(ctx,0,r*0.29,r*0.09,'#7fd6c2');dot(ctx,r*0.4,r*0.29,r*0.08,'#f0c23a');break;
+    case'egg':
+      ell(ctx,0,r*0.05,r*0.52,r*0.68);fs(ctx,'#e6dcc6');ctx.beginPath();ctx.moveTo(-r*0.5,0);ctx.lineTo(r*0.5,0);ctx.stroke();
+      [-0.3,0,0.3].forEach(a=>dot(ctx,a*r,r*0.25,r*0.07,'#b98a2c'));
+      ctx.beginPath();ctx.moveTo(r*0.5,-r*0.1);ctx.lineTo(r*0.85,-r*0.1);ctx.stroke();circ(ctx,r*0.92,-r*0.1,r*0.12);fs(ctx,'#b98a2c');break;
+    case'bell':
+      ctx.beginPath();ctx.moveTo(-r*0.6,r*0.45);ctx.quadraticCurveTo(-r*0.5,-r*0.55,0,-r*0.6);ctx.quadraticCurveTo(r*0.5,-r*0.55,r*0.6,r*0.45);ctx.closePath();fs(ctx,'#d9a441');
+      circ(ctx,0,r*0.55,r*0.14);fs(ctx,'#7a5a22');ctx.beginPath();ctx.arc(0,-r*0.7,r*0.14,0,TAU);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(r*0.75,-r*0.3);ctx.quadraticCurveTo(r*0.95,-r*0.1,r*0.75,r*0.1);ctx.stroke();break;
+    case'map':
+      ctx.beginPath();ctx.moveTo(-r*0.75,-r*0.55);ctx.lineTo(-r*0.25,-r*0.4);ctx.lineTo(r*0.25,-r*0.55);ctx.lineTo(r*0.75,-r*0.4);ctx.lineTo(r*0.75,r*0.55);ctx.lineTo(r*0.25,r*0.4);ctx.lineTo(-r*0.25,r*0.55);ctx.lineTo(-r*0.75,r*0.4);ctx.closePath();fs(ctx,'#c9b48a');
+      ctx.save();ctx.setLineDash([r*0.12,r*0.1]);ctx.strokeStyle='#a33';ctx.beginPath();ctx.moveTo(-r*0.5,r*0.25);ctx.quadraticCurveTo(-r*0.1,-r*0.35,r*0.35,r*0.05);ctx.stroke();ctx.restore();
+      ctx.beginPath();ctx.moveTo(r*0.3,-r*0.05);ctx.lineTo(r*0.5,r*0.15);ctx.moveTo(r*0.5,-r*0.05);ctx.lineTo(r*0.3,r*0.15);ctx.strokeStyle='#a33';ctx.stroke();break;
+    case'boots':
+      ctx.beginPath();ctx.moveTo(-r*0.4,-r*0.75);ctx.lineTo(r*0.15,-r*0.75);ctx.lineTo(r*0.15,r*0.05);ctx.quadraticCurveTo(r*0.85,r*0.1,r*0.85,r*0.45);ctx.lineTo(r*0.85,r*0.6);ctx.lineTo(-r*0.45,r*0.6);ctx.closePath();fs(ctx,'#80502c');
+      ctx.beginPath();ctx.moveTo(-r*0.45,r*0.4);ctx.lineTo(r*0.85,r*0.4);ctx.stroke();break;
+    case'fork':
+      ctx.beginPath();ctx.moveTo(0,-r*0.1);ctx.lineTo(0,r*0.9);ctx.lineWidth=r*0.28;ctx.stroke();ctx.lineWidth=r*0.13;ctx.strokeStyle='#aab4ba';ctx.stroke();ctx.strokeStyle=INK;ctx.lineWidth=Math.max(1,r*0.13);
+      ctx.beginPath();ctx.moveTo(-r*0.4,-r*0.85);ctx.lineTo(-r*0.4,-r*0.25);ctx.quadraticCurveTo(-r*0.4,0,0,0);ctx.quadraticCurveTo(r*0.4,0,r*0.4,-r*0.25);ctx.lineTo(r*0.4,-r*0.85);ctx.moveTo(0,-r*0.85);ctx.lineTo(0,-r*0.1);ctx.lineWidth=r*0.2;ctx.stroke();break;
+    case'gloop':
+      ctx.beginPath();ctx.moveTo(-r*0.8,r*0.5);ctx.quadraticCurveTo(-r*0.8,-r*0.2,-r*0.35,-r*0.25);ctx.quadraticCurveTo(-r*0.2,-r*0.8,r*0.2,-r*0.55);ctx.quadraticCurveTo(r*0.8,-r*0.4,r*0.75,r*0.5);ctx.closePath();fs(ctx,'#7bc043');
+      circ(ctx,-r*0.2,r*0.1,r*0.1);ctx.stroke();circ(ctx,r*0.3,-r*0.1,r*0.07);ctx.stroke();break;
+    case'nook':drawNookDoor(ctx,0,0,r,false);break;
+    case'gate':drawGate(ctx,0,0,r*1.6);break;
+  }
+  ctx.restore();
+}
+function drawNookDoor(ctx,x,y,r,open){
+  ctx.save();ctx.lineWidth=Math.max(1,r*0.14);ctx.strokeStyle=INK;
+  ctx.beginPath();ctx.arc(x,y+r*0.1,r,Math.PI,0);ctx.lineTo(x+r,y+r*0.75);ctx.lineTo(x-r,y+r*0.75);ctx.closePath();
+  if(open){fs(ctx,'#0d0b09')}else{fs(ctx,'#9a5b32');ctx.beginPath();ctx.moveTo(x-r*0.33,y-r*0.75);ctx.lineTo(x-r*0.33,y+r*0.75);ctx.moveTo(x+r*0.33,y-r*0.75);ctx.lineTo(x+r*0.33,y+r*0.75);ctx.lineWidth=Math.max(0.8,r*0.08);ctx.stroke();dot(ctx,x+r*0.55,y+r*0.25,r*0.13,'#f0c23a')}
+  ctx.restore();
+}
+function drawGate(ctx,x,y,r){
+  ctx.save();ctx.lineWidth=Math.max(1.2,r*0.07);ctx.strokeStyle=INK;
+  ctx.beginPath();ctx.moveTo(x-r*0.62,y+r*0.5);ctx.lineTo(x-r*0.62,y-r*0.05);ctx.arc(x,y-r*0.05,r*0.62,Math.PI,0);ctx.lineTo(x+r*0.62,y+r*0.5);ctx.closePath();fs(ctx,'#8e9a9b');
+  ctx.beginPath();ctx.moveTo(x-r*0.38,y+r*0.5);ctx.lineTo(x-r*0.38,y-r*0.05);ctx.arc(x,y-r*0.05,r*0.38,Math.PI,0);ctx.lineTo(x+r*0.38,y+r*0.5);ctx.closePath();fs(ctx,'#1b2340');
+  dot(ctx,x-r*0.12,y-r*0.12,r*0.04,'#f5d75a');dot(ctx,x+r*0.15,y+r*0.12,r*0.03,'#f5d75a');dot(ctx,x+r*0.05,y-r*0.3,r*0.03,'#f5d75a');
+  ctx.beginPath();ctx.moveTo(x-r*0.62,y-r*0.05);ctx.lineTo(x-r*0.38,y-r*0.05);ctx.moveTo(x+r*0.62,y-r*0.05);ctx.lineTo(x+r*0.38,y-r*0.05);ctx.moveTo(x,y-r*0.67);ctx.lineTo(x,y-r*0.43);ctx.stroke();
+  ctx.restore();
+}
+
+let tNow=0;
+function drawTile(ctx,i,X,Y,ts,hl){
+  const t=S.tiles[i],g=Math.max(1,ts*0.02),cx=X+ts/2,cy=Y+ts/2;
+  ctx.save();rr(ctx,X+g,Y+g,ts-2*g,ts-2*g,ts*0.09);ctx.fillStyle=HEDGE;ctx.fill();ctx.clip();
+  const R=rng(t.seed);ctx.lineCap='round';ctx.lineWidth=Math.max(1,ts*0.028);
+  for(let k=0;k<11;k++){const lx=X+R()*ts,ly=Y+R()*ts,r0=ts*(0.035+R()*0.05),a=R()*TAU;ctx.strokeStyle=R()<0.55?HEDGE_D:HEDGE_L;ctx.beginPath();ctx.arc(lx,ly,r0,a,a+1.8+R());ctx.stroke()}
+  const ang=anim.tile[i]??t.rot*Math.PI/2;
+  ctx.save();ctx.translate(cx,cy);ctx.rotate(ang);
+  const w=ts*0.38,half=ts/2,ink=Math.max(1.5,ts*0.03);const arms=[[0,-1],[1,0],[0,1],[-1,0]];
+  const open=arms.filter((a,k)=>t.base&(1<<k));
+  ctx.lineCap='butt';ctx.strokeStyle=INK;ctx.lineWidth=w+ink*2;ctx.beginPath();for(const a of open){ctx.moveTo(0,0);ctx.lineTo(a[0]*half,a[1]*half)}ctx.stroke();
+  circ(ctx,0,0,w/2+ink);ctx.fillStyle=INK;ctx.fill();
+  const pc=t.kind==='gate'?'#c9d0c2':PATH;
+  ctx.strokeStyle=pc;ctx.lineWidth=w;ctx.beginPath();for(const a of open){ctx.moveTo(0,0);ctx.lineTo(a[0]*half,a[1]*half)}ctx.stroke();circ(ctx,0,0,w/2);ctx.fillStyle=pc;ctx.fill();
+  const R2=rng(t.seed+99);for(const a of open)for(let k=0;k<2;k++){const s=half*(0.35+R2()*0.55),o=(R2()-0.5)*w*0.6;dot(ctx,a[0]*s+a[1]*o,a[1]*s+a[0]*o,ts*(0.012+R2()*0.01),PATH_D)}
+  ctx.restore();
+  if(t.kind==='start'&&t.owner){ctx.save();ctx.strokeStyle=HEROES[t.owner].color;ctx.lineWidth=ts*0.035;ctx.setLineDash([ts*0.05,ts*0.04]);circ(ctx,cx,cy,ts*0.25);ctx.stroke();ctx.restore()}
+  if(t.kind==='gate'){drawGate(ctx,cx,cy,ts*0.5);
+    ctx.save();ctx.fillStyle=MIST;ctx.font=`${ts*0.13}px ${getComputedStyle(document.body).getPropertyValue('--font-display')||'serif'}`;const z=(tNow/900)%1;
+    ctx.globalAlpha=1-z;ctx.fillText('z',cx+ts*0.22,cy-ts*0.18-z*ts*0.12);ctx.globalAlpha=1-((z+0.5)%1);ctx.fillText('z',cx+ts*0.3,cy-ts*0.26-((z+0.5)%1)*ts*0.12);ctx.restore()}
+  if(t.nook){const nx=cx-ts*0.3,ny=cy-ts*0.33;drawNookDoor(ctx,nx,ny,ts*0.11,t.nook.searched);
+    const p=S.phase==='play'?cur():null;
+    if(!t.nook.searched&&p&&p.ctrl==='human'&&p.hero==='zizi'&&p.known[i]){ctx.save();circ(ctx,nx,ny+ts*0.03,ts*0.13);ctx.fillStyle='rgba(255,243,176,.92)';ctx.fill();ctx.restore();drawRelic(ctx,p.known[i],nx,ny+ts*0.03,ts*0.09)}}
+  t.ground.forEach((r,k)=>{const gx=cx+ts*0.3-k*ts*0.17,gy=cy+ts*0.3;ctx.save();circ(ctx,gx,gy,ts*0.12);ctx.fillStyle='rgba(240,167,58,.35)';ctx.fill();ctx.restore();drawRelic(ctx,r,gx,gy,ts*0.09)});
+  ctx.restore();
+  if(hl){
+    ctx.save();rr(ctx,X+g*2,Y+g*2,ts-4*g,ts-4*g,ts*0.09);const pulse=0.5+0.5*Math.sin(tNow/260);
+    if(hl==='move'||hl==='target'){ctx.fillStyle=`rgba(240,167,58,${0.12+0.12*pulse})`;ctx.fill();ctx.strokeStyle=MARI;ctx.lineWidth=ts*0.04;if(hl==='move')ctx.setLineDash([ts*0.09,ts*0.05]);ctx.stroke()}
+    else if(hl==='burrow'){ctx.strokeStyle=BEET;ctx.lineWidth=ts*0.035;ctx.setLineDash([ts*0.06,ts*0.05]);ctx.stroke()}
+    else if(hl==='twist'||hl==='spin'){ctx.strokeStyle=hl==='spin'?MARI:'rgba(220,232,223,.75)';ctx.lineWidth=ts*0.03;ctx.setLineDash([ts*0.04,ts*0.04]);ctx.stroke();ctx.setLineDash([]);
+      const ax=X+ts*0.2,ay=Y+ts*0.8,ar=ts*0.09;ctx.fillStyle='rgba(15,30,29,.8)';circ(ctx,ax,ay,ar*1.45);ctx.fill();ctx.strokeStyle=hl==='spin'?MARI:MIST;ctx.lineWidth=ts*0.025;ctx.beginPath();ctx.arc(ax,ay,ar,-Math.PI*0.9,Math.PI*0.5);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(ax-ar*0.25,ay+ar*1.35);ctx.lineTo(ax,ay+ar);ctx.lineTo(ax-ar*0.35,ay+ar*0.65);ctx.stroke()}
+    else if(hl==='spinlock'){ctx.strokeStyle=MARI;ctx.lineWidth=ts*0.06;ctx.stroke()}
+    else if(hl==='monster'){ctx.strokeStyle=BEET;ctx.lineWidth=ts*0.05;ctx.globalAlpha=0.6+0.4*pulse;ctx.stroke()}
+    ctx.restore();
+  }
+}
+function highlights(){
+  const h={};if(!S||S.phase!=='play')return h;const p=cur();if(p.ctrl!=='human')return h;
+  const pd=S.pending;
+  const nbrs=[];for(let d=0;d<4;d++){const nx=p.x+DIRS[d].dx,ny=p.y+DIRS[d].dy;if(inB(nx,ny))nbrs.push([d,nx,ny])}
+  if(pd){
+    if(pd.card==='hop')nbrs.forEach(([d,x,y])=>h[idx(x,y)]='target');
+    if(pd.card==='spin'){if(pd.tile!=null)h[pd.tile]='spinlock';else S.tiles.forEach((t,i)=>{if(!t.fixed)h[i]='spin'})}
+    if(pd.card==='whistle'){S.monsters.forEach((m,mi)=>h[idx(m.x,m.y)]='monster');if(pd.mi!=null)monsterReach(S.monsters[pd.mi]).forEach(i=>h[i]='target')}
+    if(pd.card==='butter')S.players.forEach(q=>{if(q!==p&&q.relics.length)h[idx(q.x,q.y)]='target'});
+    return h;
+  }
+  if(S.mode==='twist'){[[p.x,p.y],...nbrs.map(n=>[n[1],n[2]])].forEach(([x,y])=>{if(canTwist(p,x,y))h[idx(x,y)]='twist'});return h}
+  nbrs.forEach(([d,x,y])=>{if(connected(p.x,p.y,d)&&S.ap>=1)h[idx(x,y)]='move';else if(p.hero==='pip'&&S.ap>=2)h[idx(x,y)]='burrow'});
+  return h;
+}
+function drawPieces(ctx,ts,m,dt){
+  const occ={};
+  S.monsters.forEach((mo,i)=>{(occ[idx(mo.x,mo.y)]??=[]).push({key:'m'+i,kind:'mon',id:mo.type})});
+  S.players.forEach((p,i)=>{(occ[idx(p.x,p.y)]??=[]).push({key:'p'+i,kind:'hero',id:p.hero,p,i})});
+  const list=[];const k=reduced?1:Math.min(1,dt*11);
+  for(const ti in occ){const arr=occ[ti],n=arr.length,tx=ti%N,ty=(ti/N)|0;
+    const offs=n===1?[[0,0]]:n===2?[[-.19,.02],[.19,.02]]:n===3?[[-.19,.12],[.19,.12],[0,-.17]]:[[-.19,-.15],[.19,-.15],[-.19,.17],[.19,.17],[0,0]];
+    arr.forEach((o,j)=>{const off=offs[j%offs.length];const tgx=tx+0.5+off[0],tgy=ty+0.5+off[1];const a=anim.piece[o.key]??={x:tgx,y:tgy};a.x+=(tgx-a.x)*k;a.y+=(tgy-a.y)*k;o.sx=m+a.x*ts;o.sy=m+a.y*ts;o.r=ts*(n>1?0.15:0.21);list.push(o)})}
+  list.sort((a,b)=>a.sy-b.sy);
+  for(const o of list){
+    if(o.kind==='hero'&&S.phase==='play'&&o.i===S.turn){ctx.save();const pul=0.5+0.5*Math.sin(tNow/220);ctx.strokeStyle=MARI;ctx.lineWidth=ts*0.03;ctx.globalAlpha=0.55+0.45*pul;ell(ctx,o.sx,o.sy+o.r*0.82,o.r*(1.05+pul*0.15),o.r*0.38);ctx.stroke();ctx.restore()}
+    if(o.kind==='mon')drawMonster(ctx,o.id,o.sx,o.sy,o.r*1.08);else drawHero(ctx,o.id,o.sx,o.sy,o.r);
+    if(o.kind==='hero'&&o.p.relics.length){const bx=o.sx+o.r*0.8,by=o.sy-o.r*0.8,br=Math.max(7,o.r*0.38);ctx.save();ctx.lineWidth=1.5;ctx.strokeStyle=INK;starPath(ctx,bx,by,br,br*0.55);fs(ctx,MARI);ctx.fillStyle=INK;ctx.font=`800 ${br*0.95}px Alegreya Sans, sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(o.p.relics.length,bx,by+br*0.06);ctx.restore()}
+  }
+}
+let lastT=performance.now();
+function frame(now){
+  const dt=Math.min(0.06,(now-lastT)/1000);lastT=now;tNow=now;
+  if(S&&cssW>0){
+    const ctx=bctx;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,cssW,cssW);
+    const{m,ts}=geo();rr(ctx,0,0,cssW,cssW,18);ctx.fillStyle='#0e2221';ctx.fill();
+    const k=reduced?1:Math.min(1,dt*12);
+    S.tiles.forEach((t,i)=>{const tg=t.rot*Math.PI/2;if(anim.tile[i]==null)anim.tile[i]=tg;anim.tile[i]+=(tg-anim.tile[i])*k;if(Math.abs(tg-anim.tile[i])<0.002)anim.tile[i]=tg});
+    const hl=highlights();
+    for(let i=0;i<N*N;i++)drawTile(ctx,i,m+(i%N)*ts,m+((i/N)|0)*ts,ts,hl[i]);
+    drawPieces(ctx,ts,m,dt);
+  }
+  requestAnimationFrame(frame);
+}
+function paint(root){
+  root.querySelectorAll('canvas.ico').forEach(c=>{
+    const size=+c.dataset.size,[kind,id]=c.dataset.ico.split(':');const pr=Math.min(2.5,window.devicePixelRatio||1);
+    c.width=size*pr;c.height=size*pr;const ctx=c.getContext('2d');ctx.setTransform(pr,0,0,pr,0,0);
+    if(kind==='hero'||kind==='mon'){circ(ctx,size/2,size/2,size/2-1);ctx.fillStyle=kind==='hero'?'#2b5553':'#3a2a30';ctx.fill();
+      if(kind==='hero'){ctx.lineWidth=2;ctx.strokeStyle=HEROES[id].color;ctx.stroke()}
+      (kind==='hero'?drawHero:drawMonster)(ctx,id,size/2,size*0.52,size*0.3)}
+    else drawRelic(ctx,id,size/2,size/2,size*0.36);
+  });
+}
+
+// ---------- boot ----------
+function resume(s){
+  S=s;S.token=(S.token||0)+1;anim.reset();
+  if(S.phase==='monsters'){render();monsterPhase()}
+  else{S.phase='play';render();if(cur().ctrl==='ai')runAI(S.token)}
+}
+function boot(data){
+  resize();requestAnimationFrame(frame);
+  if(data&&data.S&&data.S.tiles){resume(data.S);return}
+  newGame(seatCfg,true);showSetup();
+}
+try{window.claude?.hot?.snapshot?.(()=>({S}))}catch(e){}
+window.__twisty={get S(){return S},newGame:(cfg)=>newGame(cfg||seatCfg,false)};
+window.claude?.hot?.ready?window.claude.hot.ready(boot):boot(window.claude?.hot?.data??{});
+})();
+</script>
